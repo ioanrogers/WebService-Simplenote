@@ -3,13 +3,7 @@ package WebService::Simplenote;
 # ABSTRACT: access and sync with simplenoteapp.com
 
 # TODO: cache authentication token between runs, use LWP cookie_jar for auth token
-# TODO: How to handle simultaneous edits?
-# TODO: Windows compatibility?? This has not been tested AT ALL yet
-# TODO: Further testing on Linux - mainly file creation time
 # TODO: Net::HTTP::Spore?
-# TODO: use file extension to determine if a note is markdown or not?
-# TODO: abstract synbc db use e.g. SQLite
-# TODO: abstract note storage
 
 our $VERSION = '0.001';
 
@@ -48,30 +42,7 @@ has notes => (
     default => sub { {} },
 );
 
-has store => (
-    is       => 'rw',
-    isa      => 'WebService::Simplenote::Storage',
-    lazy => 1,
-    builder => '_load_storage_plugin',
-);
-
-has storage_plugin => (
-    is => 'ro',
-    isa => 'Str',
-    required => 1,
-    lazy => 1,
-    default => 'file',
-);
-
-has storage_opts => (
-    is => 'ro',
-    isa => 'HashRef',
-    required => 1,
-    lazy => 1,
-    default => sub {{}},
-);
-
-has [ 'allow_server_updates', 'allow_local_updates' ] => (
+has allow_server_updates => (
     is       => 'ro',
     isa      => 'Bool',
     required => 1,
@@ -124,17 +95,6 @@ sub _build_token {
     return $response->content;
 }
 
-sub _load_storage_plugin {
-    my $self = shift;
-    
-    my $plugin = 'WebService::Simplenote::Storage::';
-    $plugin .= ucfirst $self->storage_plugin;
-    $self->logger->debug('Loading storage plugin: ' . $plugin);
-    Class::Load::load_class($plugin);
-
-    return $plugin->new($self->storage_opts);
-}
-
 # Get list of notes from simplenote server
 # TODO since, mark, length options
 sub get_remote_index {
@@ -165,10 +125,6 @@ sub put_note {
         return;
     }
     
-    my $json = JSON->new;
-    $json->allow_blessed;
-    $json->convert_blessed;
-    
     my $req_uri = sprintf '%s/data', $self->_uri;
 
     if ( defined $note->key ) {
@@ -180,23 +136,25 @@ sub put_note {
 
     $req_uri .= sprintf '?auth=%s&email=%s', $self->token, $self->email;
     $self->logger->debug("Network: POST to [$req_uri]");
-    my $content = $json->utf8->encode($note);
+    
+    my $content = $note->freeze;
     
     my $response = $self->_ua->post( $req_uri, Content => $content );
 
     if ( !$response->is_success ) {
-        $self->logger->error( 'Failed uploading note: ' . $response->status_line );
+        $self->logger->errorf( 'Failed uploading note: %s', $response->status_line);
+        return;
     }
 
-    my $note_data = decode_json( $response->content );
-
+    my $note_tmp = WebService::Simplenote::Note->thaw( $response->content );
+    
+    # a brand new note will have a key generated remotely
     if ( !defined $note->key ) {
-        $note->key( $note_data->{key} );
+        return $note_tmp->key;
     }
     
-    $self->{notes}->{$note->key} = $note;
-    
-    return 1;
+    #TODO better return values
+    return;
 }
 
 # Save local copy of note from Simplenote server
@@ -221,20 +179,7 @@ sub get_note {
     $note = WebService::Simplenote::Note->new($new_data);
 
     $note->title( $self->_get_title_from_content( $note ) );
-    $note->file( $self->title_to_filename( $note->title ) );
-
-    if ( !$self->allow_local_updates ) {
-        return;
-    }
-    my $fh = $note->file->open('w');
-    $fh->print( $note->content );
-    $fh->close;
-
-    # Set created and modified time
-    # XXX: Not sure why this has to be done twice, but it seems to on Mac OS X
-    utime $note->createdate->epoch, $note->modifydate->epoch, $note->file;
-
-    #utime $create, $modify, $filename;
+    
     $self->notes->{$note->key} = $note;
 
     return 1;

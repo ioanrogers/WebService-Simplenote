@@ -5,6 +5,7 @@ package WebService::Simplenote::Note;
 use v5.10;
 use Moose;
 use MooseX::Types::DateTime qw/DateTime/;
+use DateTime;
 use MooseX::Storage;
 
 with Storage( 'format' => 'JSON' );
@@ -70,7 +71,7 @@ has content => (
 
 MooseX::Storage::Engine->add_custom_type_handler(
     'DateTime' => (
-        expand   => sub { DateTime->from_epoch( epoch => $_[0] ) },
+        expand   => sub { $_[0] },
         collapse => sub { $_[0]->epoch }
     )
 );
