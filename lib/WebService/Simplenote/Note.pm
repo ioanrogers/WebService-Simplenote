@@ -8,7 +8,7 @@ use MooseX::Types::DateTime qw/DateTime/;
 use DateTime;
 use MooseX::Storage;
 
-with Storage( 'format' => 'JSON' );
+with Storage( 'format' => 'JSON', traits => [qw|OnlyWhenBuilt|] );
 
 # set by server
 has key => (
