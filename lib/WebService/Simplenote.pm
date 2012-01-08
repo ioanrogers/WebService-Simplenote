@@ -159,30 +159,24 @@ sub put_note {
 
 # Save local copy of note from Simplenote server
 sub get_note {
-    my ( $self, $note ) = @_;
+    my ( $self, $key ) = @_;
 
-    $self->logger->infof( 'Retrieving note [%s]', $note->key );
+    $self->logger->infof( 'Retrieving note [%s]', $key );
 
     # TODO are there any other encoding options?
-    my $req_uri = sprintf '%s/data/%s?auth=%s&email=%s', $self->_uri, $note->key,
+    my $req_uri = sprintf '%s/data/%s?auth=%s&email=%s', $self->_uri, $key,
       $self->token, $self->email;
     my $response = $self->_ua->get($req_uri);
 
     if ( !$response->is_success ) {
         $self->logger->errorf( '[%s] could not be retrieved: %s',
-            $note->key, $response->status_line );
+            $key, $response->status_line );
         return;
     }
-    my $new_data = decode_json( $response->content );
-
-    # XXX: anything to merge?
-    $note = WebService::Simplenote::Note->new($new_data);
-
-    $note->title( $self->_get_title_from_content( $note ) );
     
-    $self->notes->{$note->key} = $note;
+    my $note = WebService::Simplenote::Note->thaw($response->content);
 
-    return 1;
+    return $note;
 }
 
 # Delete specified note from Simplenote server
@@ -208,87 +202,6 @@ sub delete_note {
     return 1;
 }
 
-sub merge_conflicts {
-
-    # Both the local copy and server copy were changed since last sync
-    # We'll merge the changes into a new master file, and flag any conflicts
-    # TODO spawn some diff tool?
-    my ( $self, $key ) = @_;
-
-}
-
-# Main Synchronization routine
-sub sync_notes {
-    my ($self) = @_;
-
-    $self->logger->info('Starting sync run');
-    # get list of existing notes from server with mod date and delete status
-    my $remote_notes = $self->get_remote_index;
-
-    # get previous sync info, if available
-    $self->store->read_sync_db;
-
-    while ( my ( $key, $note ) = each $remote_notes ) {
-        if ( exists $self->notes->{$key} ) {
-
-            # which is newer?
-            $self->logger->debug("[$key] exists locally and remotely");
-            # TODO check if either side has trashed this note
-            given ( DateTime->compare( $note->modifydate, $self->notes->{$key}->modifydate ) ) {
-                when (0) {
-                    $self->logger->debug("[$key] not modified");
-                }
-                when (1) {
-                    $self->logger->debug("[$key] remote note is newer");
-                    $self->get_note($note);
-                }
-                when (-1) {
-                    $self->logger->debug("[$key] local note is newer");
-                    $self->put_note($note);
-                }
-            }
-        } else {
-            $self->logger->debug("[$key] does not exist locally");
-            if ( !$note->deleted ) { # TODO this is app-level decision
-                $self->get_note($note);
-            }
-        }
-    }
-
-    # TODO abstract this out
-    # Finally, we need to look at new files locally and upload to server
-    $self->logger->debugf( 'Looking for new files in [%s]', $self->sync_dir->stringify );
-    while ( my $f = $self->sync_dir->next ) {
-        next unless -f $f;
-        $self->logger->debug("Checking $f");
-        my $is_known = 0;
-        foreach my $note ( values %{ $self->notes } ) {
-            $self->logger->debugf('Comparing [%s] to [%s]', $note->file->stringify, $f->stringify); 
-            if ( $note->file eq $f ) {
-                $is_known = 1;
-                last;
-            }
-        }
-        if (!$is_known) {
-            $self->logger->info("New local file [$f]");
-            my $content = $f->slurp; # TODO: iomode + encoding
-            my $note = WebService::Simplenote::Note->new(
-                createdate => $f->stat->ctime,
-                modifydate => $f->stat->mtime,
-                content    => $content,
-                systemtags => ['markdown'],
-                file       => $f,
-            );
-
-            $self->put_note($note);
-        }
-    }
-    
-    $self->_write_sync_database;
-    $self->logger->info('Finished sync run');
-}
-
-no Moose;
 __PACKAGE__->meta->make_immutable;
 
 1;

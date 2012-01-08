@@ -21,8 +21,7 @@ my $note = WebService::Simplenote::Note->new(
 ok( defined $note,                              'new() returns something' );
 ok( $note->isa('WebService::Simplenote::Note'), '... the correct class' );
 
-my $title = $note->_get_title_from_content;
-cmp_ok($title, 'eq', 'Some Content', 'Title is correct');
+cmp_ok($note->title, 'eq', 'Some Content', 'Title is correct');
 
 ok( my $json_str = $note->freeze, 'Serialise note to JSON' );
 ok( my $note_from_json = decode_json $json_str, '...JSON is valid');

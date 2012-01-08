@@ -7,6 +7,7 @@ use Moose;
 use MooseX::Types::DateTime qw/DateTime/;
 use DateTime;
 use MooseX::Storage;
+use namespace::autoclean;
 
 with Storage( 'format' => 'JSON', traits => [qw|OnlyWhenBuilt|] );
 
@@ -27,8 +28,6 @@ has [ 'sharekey', 'publishkey' ] => (
 has title => (
     is  => 'rw',
     isa => 'Str',
-
-    #required => 1,
 );
 
 has deleted => (
@@ -67,6 +66,7 @@ has systemtags => (
 has content => (
     is  => 'rw',
     isa => 'Str',
+    trigger => \&_get_title_from_content,
 );
 
 MooseX::Storage::Engine->add_custom_type_handler(
@@ -79,7 +79,7 @@ MooseX::Storage::Engine->add_custom_type_handler(
 # TODO: auto change title on content change?
 sub _get_title_from_content {
     my $self = shift;
-
+    
     my $content = $self->content;
 
     # First line is title
@@ -88,13 +88,20 @@ sub _get_title_from_content {
 
     # Strip prohibited characters
     # XXX preferable encoding scheme?
+    chomp $title;
+    
+    # non-word chars to space
     $title =~ s/\W/ /g;
+    
+    # trim leading and trailing spaces
     $title =~ s/^\s+//;
     $title =~ s/\s+$//;
-    return $title;
+    
+    $self->title($title);
+    
+    return 1;
 }
 
-no Moose;
 __PACKAGE__->meta->make_immutable;
 
 1;
