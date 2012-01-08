@@ -64,8 +64,8 @@ has systemtags => (
 
 # XXX: always coerce to utf-8?
 has content => (
-    is  => 'rw',
-    isa => 'Str',
+    is      => 'rw',
+    isa     => 'Str',
     trigger => \&_get_title_from_content,
 );
 
@@ -79,7 +79,7 @@ MooseX::Storage::Engine->add_custom_type_handler(
 # TODO: auto change title on content change?
 sub _get_title_from_content {
     my $self = shift;
-    
+
     my $content = $self->content;
 
     # First line is title
@@ -89,16 +89,16 @@ sub _get_title_from_content {
     # Strip prohibited characters
     # XXX preferable encoding scheme?
     chomp $title;
-    
+
     # non-word chars to space
     $title =~ s/\W/ /g;
-    
+
     # trim leading and trailing spaces
     $title =~ s/^\s+//;
     $title =~ s/\s+$//;
-    
-    $self->title($title);
-    
+
+    $self->title( $title );
+
     return 1;
 }
 
