@@ -18,7 +18,7 @@ has logger => (
     lazy     => 1,
     required => 1,
     default  => sub { return Log::Any->get_logger },
-    traits => [ 'DoNotSerialize' ],
+    traits   => ['DoNotSerialize'],
 );
 
 # set by server
