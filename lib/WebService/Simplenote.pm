@@ -1,6 +1,6 @@
 package WebService::Simplenote;
 
-# ABSTRACT: access and sync with simplenoteapp.com
+# ABSTRACT: Note-taking through simplenoteapp.com
 
 # TODO: cache authentication token between runs, use LWP cookie_jar for auth token
 # TODO: Net::HTTP::Spore?

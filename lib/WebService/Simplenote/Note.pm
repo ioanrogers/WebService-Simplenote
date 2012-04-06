@@ -7,9 +7,19 @@ use Moose;
 use MooseX::Types::DateTime qw/DateTime/;
 use DateTime;
 use MooseX::Storage;
+use Log::Any qw//;
 use namespace::autoclean;
 
 with Storage( 'format' => 'JSON', traits => [qw|OnlyWhenBuilt|] );
+
+has logger => (
+    is       => 'ro',
+    isa      => 'Object',
+    lazy     => 1,
+    required => 1,
+    default  => sub { return Log::Any->get_logger },
+    traits => [ 'DoNotSerialize' ],
+);
 
 # set by server
 has key => (
