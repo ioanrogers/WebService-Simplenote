@@ -5,7 +5,7 @@ package WebService::Simplenote;
 # TODO: cache authentication token between runs, use LWP cookie_jar for auth token
 # TODO: Net::HTTP::Spore?
 
-our $VERSION = '0.001';
+our $VERSION = '0.1.0';
 
 use v5.10;
 use Moose;
@@ -202,17 +202,6 @@ sub delete_note {
 __PACKAGE__->meta->make_immutable;
 
 1;
-
-=head1 LIMITATIONS
-
-* If the simplenotesync.db file is lost, SimplenoteSync.pl is currently unable
-  to realize that a text file and a note represent the same object --- instead
-  you should move your local text files, do a fresh sync to download all notes
-  locally, and manually replace any missing notes.
-
-* Simplenote supports multiple notes with the same title, but two files cannot
-  share the same filename. If you have two notes with the same title, only one
-  will be downloaded. I suggest changing the title of the other note.
 
 =head1 TROUBLESHOOTING
 
