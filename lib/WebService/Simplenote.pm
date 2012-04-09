@@ -42,11 +42,11 @@ has notes => (
     default => sub { {} },
 );
 
-has allow_server_updates => (
+has no_server_updates => (
     is       => 'ro',
     isa      => 'Bool',
     required => 1,
-    default  => 1,
+    default  => 0,
 );
 
 has logger => (
@@ -119,7 +119,7 @@ sub get_remote_index {
 sub put_note {
     my ( $self, $note ) = @_;
 
-    if ( !$self->allow_server_updates ) {
+    if ( $self->no_server_updates ) {
         $self->logger->warn( 'Sending notes to the server is disabled' );
         return;
     }
@@ -179,7 +179,7 @@ sub get_note {
 # Delete specified note from Simplenote server
 sub delete_note {
     my ( $self, $note ) = @_;
-    if ( !$self->allow_server_updates ) {
+    if ( $self->no_server_updates ) {
         return;
     }
 
@@ -202,19 +202,6 @@ sub delete_note {
 __PACKAGE__->meta->make_immutable;
 
 1;
-
-=head1 TROUBLESHOOTING
-
-Optionally, you can enable or disable writing changes to either the local
-directory or to the Simplenote web server. For example, if you want to attempt
-to copy files to your computer without risking your remote data, you can
-disable "$allow_server_updates". Or, you can disable "$allow_local_updates" to
-protect your local data.
-
-=head1 KNOWN ISSUES
-
-* No merging when both local and remote file are changed between syncs - this
-  might be enabled in the future
 
 =head1 SEE ALSO
 
