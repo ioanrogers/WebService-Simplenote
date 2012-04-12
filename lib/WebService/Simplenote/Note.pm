@@ -115,3 +115,19 @@ sub _get_title_from_content {
 __PACKAGE__->meta->make_immutable;
 
 1;
+
+=head1 SYNOPSIS
+
+  use WebService::Simplenote::Note;
+
+  my $note = WebService::Simplenote::Note->new(
+      content => "Some stuff",
+  );
+
+  printf "[%s] %s\n %s\n",
+      $note->modifydate->iso8601,
+      $note->title,
+      $note->content;
+  }
+
+

@@ -88,7 +88,7 @@ sub _build_token {
     my $response = $self->_ua->post( 'https://simple-note.appspot.com/api/login', Content => $content );
 
     if ( !$response->is_success ) {
-        die "Error logging into Simplenote server: " . $response->status_line . "\n";
+        die 'Error logging into Simplenote server: ' . $response->status_line . "\n";
     }
 
     return $response->content;
@@ -178,30 +178,94 @@ sub get_note {
 
 # Delete specified note from Simplenote server
 sub delete_note {
-    my ( $self, $note ) = @_;
+    my ( $self, $note_id ) = @_;
     if ( $self->no_server_updates ) {
         return;
     }
 
     # XXX worth checking if note is flagged as deleted?
-    $self->logger->infof( '[%s] Deleting from trash', $note->key );
+    $self->logger->infof( '[%s] Deleting from trash', $note_id );
 
-    my $req_uri = sprintf '%s/data?key=%s&auth=%s&email=%s', $self->_uri, $note->key, $self->token, $self->email;
+    my $req_uri = sprintf '%s/data?key=%s&auth=%s&email=%s', $self->_uri, $note_id, $self->token, $self->email;
 
     my $response = $self->_ua->delete( $req_uri );
 
     if ( !$response->is_success ) {
-        $self->logger->errorf( '[%s] Failed to delete note from trash: %s', $note->key, $response->status_line );
+        $self->logger->errorf( '[%s] Failed to delete note from trash: %s', $note_id, $response->status_line );
         return;
     }
 
-    delete $self->notes->{ $note->key };
+    delete $self->notes->{ $note_id };
     return 1;
 }
 
 __PACKAGE__->meta->make_immutable;
 
 1;
+
+=head1 SYNOPSIS
+
+  use WebService::Simplenote;
+  use WebService::Simplenote::Note;
+
+  my $sn = WebService::Simplenote->new(
+      email    => $email,
+      password => $password,
+  );
+
+  my $notes = $sn->get_remote_index;
+
+  foreach my $note_id (keys %$notes) {
+      say "Retrieving note id [$note_id]";
+      my $note = $sn->get_note($note_id);
+      printf "[%s] %s\n %s\n",
+          $note->modifydate->iso8601,
+          $note->title,
+          $note->content;
+  }
+
+  my $new_note = WebService::Simplenote::Note->new(
+      content => "Some stuff",
+  );
+
+  $sn->put_note($new_note);
+
+=head1 DESCRIPTION
+
+This module proves API access to the cloud-based note software at
+L<https://simplenoteapp.com|Simplenote>.
+
+=head1 ERRORS
+
+Will C<die> if unable to connect/login. Returns C<undef> for other errors.
+
+=head1 METHODS
+
+=over
+
+=item WebService::Simplenote->new($args)
+
+Requires the C<email> and C<password> for your simplenote account. You can also
+provide a L<Log::Any> compatible C<logger>.
+
+=item get_remote_index
+
+Returns a hashref of L<WebService::Simplenote::Note|notes>. The notes are keyed by id.
+
+=item get_note($note_id)
+
+Retrieves a note from the remote server and returns it as a L<WebService::Simplenote::Note>.
+C<$note_id> is an alphanumeric key generated on the server side.
+
+=item put_note($note)
+
+Puts a L<WebService::Simplenote::Note> to the remote server
+
+=item delete_note($note_id)
+
+Delete the specified note
+
+=back
 
 =head1 SEE ALSO
 
