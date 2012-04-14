@@ -7,6 +7,7 @@ package WebService::Simplenote::Note;
 use v5.10;
 use Moose;
 use MooseX::Types::DateTime qw/DateTime/;
+use WebService::Simplenote::Types;
 use DateTime;
 use MooseX::Storage;
 use Log::Any qw//;
@@ -61,16 +62,30 @@ has [ 'syncnum', 'version', 'minversion' ] => (
 
 has tags => (
     is      => 'rw',
+    traits  => ['Array'],
     isa     => 'ArrayRef[Str]',
     default => sub { [] },
+    handles => {
+        add_tag     => 'push',
+        join_tags   => 'join',
+        has_tags    => 'count',
+        has_no_tags => 'is_empty',
+    },
 );
 
 has systemtags => (
     is      => 'rw',
-    isa     => 'ArrayRef[Str]',
+    traits  => ['Array'],
+    isa     => 'ArrayRef[SystemTags]',
     default => sub { [] },
-
-    # pinned, unread, markdown, list
+    handles => {
+        set_markdown   => [ push  => 'markdown' ],
+        is_markdown    => [ first => sub {/^markdown/} ],
+        set_pinned     => [ push  => 'pinned' ],
+        join_systags   => 'join',
+        has_systags    => 'count',
+        has_no_systags => 'is_empty',
+    },
 );
 
 # XXX: always coerce to utf-8?
@@ -83,9 +98,7 @@ has content => (
 MooseX::Storage::Engine->add_custom_type_handler(
     'DateTime' => (
         expand   => sub { $_[0] },
-        collapse => sub { $_[0]->epoch }
-    )
-);
+        collapse => sub { $_[0]->epoch } ) );
 
 sub _get_title_from_content {
     my $self = shift;
@@ -143,6 +156,18 @@ L<http://simplenoteapp.com/api/|Simplenote API> docs for full details
 
 The minimum required attribute to set is C<content>.
 
+=item add_tag($str)
+
+Push a new tag onto C<tags>.
+
+=item set_markdown
+
+Shortcut to set the C<markdown> system tag.
+
+=item set_pinned
+
+Shortcut to set the C<pinned> system tag.
+
 =back
 
 =head1 ATTRIBUTES
@@ -180,4 +205,3 @@ Arrayref[Str]; special tags.
 =item content
 
 The body of the note
-
