@@ -79,9 +79,9 @@ has systemtags => (
     isa     => 'ArrayRef[SystemTags]',
     default => sub { [] },
     handles => {
-        set_markdown   => [ push  => 'markdown' ],
-        is_markdown    => [ first => sub {/^markdown/} ],
-        set_pinned     => [ push  => 'pinned' ],
+        set_markdown => [ push  => 'markdown' ],
+        is_markdown  => [ first => sub { /^markdown/ } ],
+        set_pinned   => [ push  => 'pinned' ],
         join_systags   => 'join',
         has_systags    => 'count',
         has_no_systags => 'is_empty',
@@ -98,7 +98,9 @@ has content => (
 MooseX::Storage::Engine->add_custom_type_handler(
     'DateTime' => (
         expand   => sub { $_[0] },
-        collapse => sub { $_[0]->epoch } ) );
+        collapse => sub { $_[0]->epoch }
+    )
+);
 
 sub _get_title_from_content {
     my $self = shift;

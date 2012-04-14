@@ -12,11 +12,7 @@ use Log::Any::Adapter;
 my $email    = shift;
 my $password = shift;
 
-my $logger = Log::Dispatch->new(
-    outputs => [
-        ['Screen', min_level => 'debug', newline => 1 ],
-    ],
-);
+my $logger = Log::Dispatch->new( outputs => [ [ 'Screen', min_level => 'debug', newline => 1 ], ], );
 Log::Any::Adapter->set( 'Dispatch', dispatcher => $logger );
 
 my $sn = WebService::Simplenote->new(
@@ -26,19 +22,14 @@ my $sn = WebService::Simplenote->new(
 
 my $notes = $sn->get_remote_index;
 
-foreach my $note_id (keys %$notes) {
-    my $note = $sn->get_note($note_id);
-    printf "[%s] %s\n %s\n",
-        $note->modifydate->iso8601,
-        $note->title,
-        $note->content;
-    
+foreach my $note_id ( keys %$notes ) {
+    my $note = $sn->get_note( $note_id );
+    printf "[%s] %s\n %s\n", $note->modifydate->iso8601, $note->title, $note->content;
+
     #$note->deleted(1);
     #$sn->delete_note($note);
 }
 
-my $new_note = WebService::Simplenote::Note->new(
-    content => "Some stuff",
-);
+my $new_note = WebService::Simplenote::Note->new( content => "Some stuff", );
 
-$sn->put_note($new_note);
+$sn->put_note( $new_note );

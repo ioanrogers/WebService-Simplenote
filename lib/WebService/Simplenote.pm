@@ -170,22 +170,22 @@ sub get_note {
 # Delete specified note from Simplenote server
 sub delete_note {
     my ( $self, $note ) = @_;
-    
-    if (!$note->isa('WebService::Simplenote::Note')) {
-        $self->logger->error( 'Passed $note is not a WebService::Simplenote::Note');
-        return;
-    }
-    
-    if ( $self->no_server_updates ) {
-        $self->logger->warnf( '[%s] Attempted to delete note when "no_server_updates" is set', $note->key);
+
+    if ( !$note->isa( 'WebService::Simplenote::Note' ) ) {
+        $self->logger->error( 'Passed $note is not a WebService::Simplenote::Note' );
         return;
     }
 
-    if (!$note->deleted) {
-        $self->logger->warnf( '[%s] Attempted to delete note which was not marked as trash', $note->key);
+    if ( $self->no_server_updates ) {
+        $self->logger->warnf( '[%s] Attempted to delete note when "no_server_updates" is set', $note->key );
         return;
     }
-    
+
+    if ( !$note->deleted ) {
+        $self->logger->warnf( '[%s] Attempted to delete note which was not marked as trash', $note->key );
+        return;
+    }
+
     $self->logger->infof( '[%s] Deleting from trash', $note->key );
 
     my $req_uri = sprintf '%s/data/%s?auth=%s&email=%s', $self->_uri, $note->key, $self->token, $self->email;
