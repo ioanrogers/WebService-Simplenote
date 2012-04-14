@@ -25,7 +25,7 @@ has logger => (
 
 # set by server
 has key => (
-    is  => 'ro',
+    is  => 'rw',
     isa => 'Str',
 );
 
