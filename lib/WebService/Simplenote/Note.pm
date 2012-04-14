@@ -148,7 +148,7 @@ __PACKAGE__->meta->make_immutable;
 =head1 DESCRIPTION
 
 This class represents a note suitable for use with Simplenote. You should read the 
-L<http://simplenoteapp.com/api/|Simplenote API> docs for full details
+L<Simplenote API|http://simplenoteapp.com/api/> docs for full details
 
 =head1 METHODS
 
