@@ -10,17 +10,14 @@ our $VERSION = '0.1.0';
 use v5.10;
 use Moose;
 use MooseX::Types::Path::Class;
-use namespace::autoclean;
-
+use JSON;
 use LWP::UserAgent;
 use Log::Any qw//;
 use DateTime;
 use MIME::Base64 qw//;
-use JSON;
 use Try::Tiny;
-use Class::Load;
-
 use WebService::Simplenote::Note;
+use namespace::autoclean;
 
 has [ 'email', 'password' ] => (
     is       => 'ro',
@@ -34,12 +31,6 @@ has token => (
     required => 1,
     lazy     => 1,
     builder  => '_build_token',
-);
-
-has notes => (
-    is      => 'rw',
-    isa     => 'HashRef[WebService::Simplenote::Note]',
-    default => sub { {} },
 );
 
 has no_server_updates => (
@@ -82,7 +73,7 @@ sub _build_token {
 
     my $content = MIME::Base64::encode_base64( sprintf 'email=%s&password=%s', $self->email, $self->password );
 
-    $self->logger->debug( 'Network: get token' );
+    $self->logger->debug( 'Network: getting auth token' );
 
     # the login uri uses api instead of api2 and must always be https
     my $response = $self->_ua->post( 'https://simple-note.appspot.com/api/login', Content => $content );
@@ -178,24 +169,35 @@ sub get_note {
 
 # Delete specified note from Simplenote server
 sub delete_note {
-    my ( $self, $note_id ) = @_;
+    my ( $self, $note ) = @_;
+    
+    if (!$note->isa('WebService::Simplenote::Note')) {
+        $self->logger->error( 'Passed $note is not a WebService::Simplenote::Note');
+        return;
+    }
+    
     if ( $self->no_server_updates ) {
+        $self->logger->warnf( '[%s] Attempted to delete note when "no_server_updates" is set', $note->key);
         return;
     }
 
-    # XXX worth checking if note is flagged as deleted?
-    $self->logger->infof( '[%s] Deleting from trash', $note_id );
+    if (!$note->deleted) {
+        $self->logger->warnf( '[%s] Attempted to delete note which was not marked as trash', $note->key);
+        return;
+    }
+    
+    $self->logger->infof( '[%s] Deleting from trash', $note->key );
 
-    my $req_uri = sprintf '%s/data?key=%s&auth=%s&email=%s', $self->_uri, $note_id, $self->token, $self->email;
+    my $req_uri = sprintf '%s/data/%s?auth=%s&email=%s', $self->_uri, $note->key, $self->token, $self->email;
 
     my $response = $self->_ua->delete( $req_uri );
 
     if ( !$response->is_success ) {
-        $self->logger->errorf( '[%s] Failed to delete note from trash: %s', $note_id, $response->status_line );
+        $self->logger->errorf( '[%s] Failed to delete note from trash: %s', $note->key, $response->status_line );
+        $self->logger->debug( "Uri: [$req_uri]" );
         return;
     }
 
-    delete $self->notes->{ $note_id };
     return 1;
 }
 
@@ -263,9 +265,15 @@ Puts a L<WebService::Simplenote::Note> to the remote server
 
 =item delete_note($note_id)
 
-Delete the specified note
+Delete the specified note from the server. The note should be marked as C<deleted>
+beforehand.
 
 =back
+
+=head1 TESTING
+
+Setting the environment variables C<SIMPLENOTE_USER> and C<SIMPLENOTE_PASS> will enable remote tests.
+If you want to run the remote tests B<MAKE SURE YOU MAKE A BACKUP OF YOUR NOTES FIRST!!>
 
 =head1 SEE ALSO
 

@@ -2,6 +2,8 @@ package WebService::Simplenote::Note;
 
 # ABSTRACT: represents an individual note
 
+# TODO: API support for tags
+
 use v5.10;
 use Moose;
 use MooseX::Types::DateTime qw/DateTime/;
@@ -23,10 +25,8 @@ has logger => (
 
 # set by server
 has key => (
-    is  => 'rw',
+    is  => 'ro',
     isa => 'Str',
-
-    #required => 1,
 );
 
 # set by server
@@ -41,8 +41,9 @@ has title => (
 );
 
 has deleted => (
-    is      => 'ro',
+    is      => 'rw',
     isa     => 'Bool',
+    lazy    => 1,
     default => 0,
 );
 
@@ -86,7 +87,6 @@ MooseX::Storage::Engine->add_custom_type_handler(
     )
 );
 
-# TODO: auto change title on content change?
 sub _get_title_from_content {
     my $self = shift;
 
@@ -130,4 +130,54 @@ __PACKAGE__->meta->make_immutable;
       $note->content;
   }
 
+=head1 DESCRIPTION
+
+This class represents a note suitable for use with Simplenote. You should read the 
+L<http://simplenoteapp.com/api/|Simplenote API> docs for full details
+
+=head1 METHODS
+
+=over
+
+=item WebService::Simplenote::Note->new($args)
+
+The minimum required attribute to set is C<content>.
+
+=back
+
+=head1 ATTRIBUTES
+
+=over
+
+=item logger
+
+L<Log::Any> logger
+
+=item key
+
+Server-set unique id for the note.
+
+=item title
+
+Simplenote doens't use titles, so we autogenerate one from the first line of content.
+
+=item deleted
+
+Boolean; is this note in the trash?
+
+=item createdate/modifydate
+
+Datetime objects
+
+=item tags
+
+Arrayref[Str]; user-generated tags.
+
+=item systemtags
+
+Arrayref[Str]; special tags.
+
+=item content
+
+The body of the note
 
