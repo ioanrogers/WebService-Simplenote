@@ -234,7 +234,7 @@ __PACKAGE__->meta->make_immutable;
 
 =head1 DESCRIPTION
 
-This module proves API access to the cloud-based note software at
+This module proves v2.1.5 API access to the cloud-based note software at
 L<Simplenote|https://simplenoteapp.com>.
 
 =head1 ERRORS
