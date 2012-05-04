@@ -8,6 +8,7 @@ package WebService::Simplenote;
 our $VERSION = '0.1.1';
 
 use v5.10;
+use open qw(:std :utf8);
 use Moose;
 use MooseX::Types::Path::Class;
 use JSON;
@@ -38,6 +39,13 @@ has no_server_updates => (
     isa      => 'Bool',
     required => 1,
     default  => 0,
+);
+
+has page_size => (
+    is => 'ro',
+    isa => 'Int',
+    required => 1,
+    default => 20,
 );
 
 has logger => (
@@ -85,24 +93,58 @@ sub _build_token {
     return $response->content;
 }
 
+sub _get_remote_index_page {
+    my ($self, $mark) = @_;
+    
+    my $notes;
+    
+    my $req_uri  = sprintf '%s/index?auth=%s&email=%s&length=%i',
+        $self->_uri, $self->token, $self->email, $self->page_size;
+    
+    if (defined $mark) {
+        $self->logger->debug( 'Network: retrieving next page' );
+        $req_uri .= '&mark=' . $mark;
+    }
+    
+    my $response = $self->_ua->get( $req_uri );
+    my $index = decode_json( $response->content );
+    
+    if ($index->{count} > 0) {
+        $self->logger->debugf( 'Network: Index returned [%s] notes', $index->{count} );
+        # iterate through notes in index and load into hash
+        foreach my $i ( @{ $index->{data} } ) {
+            $notes->{ $i->{key} } = WebService::Simplenote::Note->new( $i );
+        }
+        
+    } elsif ($index->{count} == 0 && !exists $index->{mark}) {
+        $self->logger->debugf( 'Network: No more pages to retrieve' );
+    } elsif ($index->{count} == 0) {
+        $self->logger->debugf( 'Network: No notes found' );
+    }
+    
+    if (exists $index->{mark}) {
+        return ($notes, $index->{mark});
+    }
+    
+    return $notes;
+}
+
 # Get list of notes from simplenote server
 # TODO since, mark, length options
 sub get_remote_index {
     my $self  = shift;
-    my $notes = {};
 
-    $self->logger->debug( 'Network: get note index' );
-    my $req_uri  = sprintf '%s/index?auth=%s&email=%s', $self->_uri, $self->token, $self->email;
-    my $response = $self->_ua->get( $req_uri );
-    my $index    = decode_json( $response->content );
-
-    $self->logger->debugf( 'Network: Index returned [%s] notes', $index->{count} );
-
-    # iterate through notes in index and load into hash
-    foreach my $i ( @{ $index->{data} } ) {
-        $notes->{ $i->{key} } = WebService::Simplenote::Note->new( $i );
+    $self->logger->debug( 'Network: getting note index' );
+   
+    my ($notes, $mark) = $self->_get_remote_index_page;
+    
+    while (defined $mark) {
+        my $next_page;
+        ($next_page, $mark) = $self->_get_remote_index_page($mark);
+        @$notes{ keys %$next_page } = values %$next_page;
     }
-
+    
+    $self->logger->infof( 'Network: found %i remote notes', scalar keys %$notes );
     return $notes;
 }
 
