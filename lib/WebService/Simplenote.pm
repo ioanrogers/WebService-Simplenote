@@ -12,6 +12,7 @@ use Moose;
 use MooseX::Types::Path::Class;
 use JSON;
 use LWP::UserAgent;
+use HTTP::Cookies;
 use Log::Any qw//;
 use DateTime;
 use MIME::Base64 qw//;
@@ -26,12 +27,10 @@ has [ 'email', 'password' ] => (
     required => 1,
 );
 
-has token => (
-    is       => 'ro',
+has _token => (
+    is       => 'rw',
     isa      => 'Str',
-    required => 1,
-    lazy     => 1,
-    builder  => '_build_token',
+    predicate => 'has_logged_in',
 );
 
 has no_server_updates => (
@@ -64,20 +63,30 @@ has _uri => (
 );
 
 has _ua => (
-    is      => 'rw',
-    isa     => 'LWP::UserAgent',
-    default => sub {
-        my $headers = HTTP::Headers->new( Content_Type => 'application/json', );
-        return LWP::UserAgent->new(
-            agent           => "WebService::Simplenote/$VERSION",
-            default_headers => $headers,
-            env_proxy       => 1,
-        );
-    },
+    is         => 'ro',
+    isa        => 'LWP::UserAgent',
+    required   => 1,
+    lazy_build => 1,
 );
 
+method _build__ua {
+
+    my $headers = HTTP::Headers->new( Content_Type => 'application/json', );
+
+    # XXX is it worth saving cookie?? How is password more valuable than auth token?
+    # logging in is only a fraction of a second!
+    my $ua = LWP::UserAgent->new(
+        agent           => "WebService::Simplenote/$VERSION",
+        default_headers => $headers,
+        env_proxy       => 1,
+        cookie_jar      => HTTP::Cookies->new,
+    );
+      
+    return $ua;
+}
+
 # Connect to server and get a authentication token
-method _build_token {
+method _login {
     my $content = MIME::Base64::encode_base64( sprintf 'email=%s&password=%s', $self->email, $self->password );
 
     $self->logger->debug( 'Network: getting auth token' );
@@ -89,21 +98,45 @@ method _build_token {
         die 'Error logging into Simplenote server: ' . $response->status_line . "\n";
     }
 
-    return $response->content;
+    $self->_token($response->content);
+    return 1;
+}
+
+method _build_req_uri(Str $path, HashRef $options?) {
+    my $req_uri = sprintf '%s/%s', $self->_uri, $path;
+
+    if (!$self->has_logged_in) {
+        $self->_login;
+    }
+    
+    return $req_uri if !defined $options;
+    
+    $req_uri .= '?';
+    while ( my ($option, $value) = each %$options) {
+         $req_uri .= "&$option=$value";
+    }
+    
+    return $req_uri;
 }
 
 method _get_remote_index_page(Str $mark?) {
     my $notes;
     
-    my $req_uri  = sprintf '%s/index?auth=%s&email=%s&length=%i',
-        $self->_uri, $self->token, $self->email, $self->page_size;
+    my $req_uri = $self->_build_req_uri('index', { length => $self->page_size });
     
     if (defined $mark) {
         $self->logger->debug( 'Network: retrieving next page' );
         $req_uri .= '&mark=' . $mark;
     }
     
+    $self->logger->debug( 'Network: retrieving ' . $req_uri );
+    
     my $response = $self->_ua->get( $req_uri );
+    if (!$response->is_success) {
+        $self->logger->error( 'Network: ' . $response->status_line );
+        return;
+    }
+    
     my $index = decode_json( $response->content );
     
     if ($index->{count} > 0) {
@@ -151,7 +184,7 @@ method put_note(WebService::Simplenote::Note $note) {
         return;
     }
 
-    my $req_uri = sprintf '%s/data', $self->_uri;
+    my $req_uri = $self->_build_req_uri('data');
 
     if ( defined $note->key ) {
         $self->logger->infof( '[%s] Updating existing note', $note->key );
@@ -160,7 +193,6 @@ method put_note(WebService::Simplenote::Note $note) {
         $self->logger->debug( 'Uploading new note' );
     }
 
-    $req_uri .= sprintf '?auth=%s&email=%s', $self->token, $self->email;
     $self->logger->debug( "Network: POST to [$req_uri]" );
 
     my $content = $note->serialise;
@@ -188,14 +220,15 @@ method get_note(Str $key) {
     $self->logger->infof( 'Retrieving note [%s]', $key );
 
     # TODO are there any other encoding options?
-    my $req_uri = sprintf '%s/data/%s?auth=%s&email=%s', $self->_uri, $key, $self->token, $self->email;
+    my $req_uri = $self->_build_req_uri("data/$key");
+    $self->logger->debug( "Network: GETting [$req_uri]" );
     my $response = $self->_ua->get( $req_uri );
 
     if ( !$response->is_success ) {
         $self->logger->errorf( '[%s] could not be retrieved: %s', $key, $response->status_line );
         return;
     }
-
+    
     my $note = WebService::Simplenote::Note->new( $response->content );
 
     return $note;
@@ -215,9 +248,8 @@ method delete_note(WebService::Simplenote::Note $note) {
     }
 
     $self->logger->infof( '[%s] Deleting from trash', $note->key );
-
-    my $req_uri = sprintf '%s/data/%s?auth=%s&email=%s', $self->_uri, $note->key, $self->token, $self->email;
-
+    my $req_uri = $self->_build_req_uri('data/' . $note->key);
+    $self->logger->debug( "Network: DELETE on [$req_uri]" );
     my $response = $self->_ua->delete( $req_uri );
 
     if ( !$response->is_success ) {

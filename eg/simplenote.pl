@@ -24,7 +24,7 @@ my $notes = $sn->get_remote_index;
 
 foreach my $note_id ( keys %$notes ) {
     my $note = $sn->get_note( $note_id );
-    printf "[%s] %s\n %s\n", $note->modifydate->iso8601, $note->title, $note->content;
+    printf "[%s] %s\n\n", $note->modifydate->iso8601, $note->title;
 
     #$note->deleted(1);
     #$sn->delete_note($note);
@@ -32,4 +32,4 @@ foreach my $note_id ( keys %$notes ) {
 
 my $new_note = WebService::Simplenote::Note->new( content => "Some stuff", );
 
-$sn->put_note( $new_note );
+#$sn->put_note( $new_note );

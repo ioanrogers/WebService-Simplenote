@@ -17,7 +17,7 @@ my $sn = WebService::Simplenote->new(
 ok( defined $sn,                          'new() returns something' );
 ok( $sn->isa( 'WebService::Simplenote' ), '... the correct class' );
 
-ok( $sn->_build_token, 'log in and get auth token' );
+ok( $sn->_login, 'log in and get auth token' );
 
 ok( my $remote_index = $sn->get_remote_index, 'list remote notes' );
 
