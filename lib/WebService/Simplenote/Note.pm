@@ -6,10 +6,10 @@ package WebService::Simplenote::Note;
 
 use v5.10;
 use Moose;
-use Method::Signatures;
 use MooseX::Types::DateTime qw/DateTime/;
 use WebService::Simplenote::Note::Meta::Types;
 use WebService::Simplenote::Note::Meta::Attribute::Trait::NotSerialised;
+use Method::Signatures;
 use DateTime;
 use JSON qw//;
 use Log::Any qw//;

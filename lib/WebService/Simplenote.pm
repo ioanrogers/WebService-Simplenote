@@ -9,7 +9,6 @@ our $VERSION = '0.1.2';
 use v5.10;
 use open qw(:std :utf8);
 use Moose;
-use Method::Signatures;
 use MooseX::Types::Path::Class;
 use JSON;
 use LWP::UserAgent;
@@ -18,6 +17,7 @@ use DateTime;
 use MIME::Base64 qw//;
 use Try::Tiny;
 use WebService::Simplenote::Note;
+use Method::Signatures;
 use namespace::autoclean;
 
 has [ 'email', 'password' ] => (
@@ -91,7 +91,7 @@ method _build_token {
     return $response->content;
 }
 
-method _get_remote_index_page(Str $mark) {
+method _get_remote_index_page(Str $mark?) {
     my $notes;
     
     my $req_uri  = sprintf '%s/index?auth=%s&email=%s&length=%i',
