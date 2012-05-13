@@ -2,7 +2,6 @@ package WebService::Simplenote;
 
 # ABSTRACT: Note-taking through simplenoteapp.com
 
-# TODO: cache authentication token between runs, use LWP cookie_jar for auth token
 # TODO: Net::HTTP::Spore?
 
 our $VERSION = '0.1.2';
@@ -10,6 +9,7 @@ our $VERSION = '0.1.2';
 use v5.10;
 use open qw(:std :utf8);
 use Moose;
+use Method::Signatures;
 use MooseX::Types::Path::Class;
 use JSON;
 use LWP::UserAgent;
@@ -76,9 +76,7 @@ has _ua => (
 );
 
 # Connect to server and get a authentication token
-sub _build_token {
-    my $self = shift;
-
+method _build_token {
     my $content = MIME::Base64::encode_base64( sprintf 'email=%s&password=%s', $self->email, $self->password );
 
     $self->logger->debug( 'Network: getting auth token' );
@@ -93,9 +91,7 @@ sub _build_token {
     return $response->content;
 }
 
-sub _get_remote_index_page {
-    my ($self, $mark) = @_;
-    
+method _get_remote_index_page(Str $mark) {
     my $notes;
     
     my $req_uri  = sprintf '%s/index?auth=%s&email=%s&length=%i',
@@ -130,10 +126,8 @@ sub _get_remote_index_page {
 }
 
 # Get list of notes from simplenote server
-# TODO since, mark, length options
-sub get_remote_index {
-    my $self  = shift;
-
+# TODO since, length options
+method get_remote_index {
     $self->logger->debug( 'Network: getting note index' );
    
     my ($notes, $mark) = $self->_get_remote_index_page;
@@ -149,9 +143,8 @@ sub get_remote_index {
 }
 
 # Given a local file, upload it as a note at simplenote web server
-sub put_note {
-    my ( $self, $note ) = @_;
-
+method put_note(WebService::Simplenote::Note $note) {
+    
     if ( $self->no_server_updates ) {
         $self->logger->warn( 'Sending notes to the server is disabled' );
         return;
@@ -190,9 +183,7 @@ sub put_note {
 }
 
 # Save local copy of note from Simplenote server
-sub get_note {
-    my ( $self, $key ) = @_;
-
+method get_note(Str $key) {
     $self->logger->infof( 'Retrieving note [%s]', $key );
 
     # TODO are there any other encoding options?
@@ -210,13 +201,7 @@ sub get_note {
 }
 
 # Delete specified note from Simplenote server
-sub delete_note {
-    my ( $self, $note ) = @_;
-
-    if ( !$note->isa( 'WebService::Simplenote::Note' ) ) {
-        $self->logger->error( 'Passed $note is not a WebService::Simplenote::Note' );
-        return;
-    }
+method delete_note(WebService::Simplenote::Note $note) {
 
     if ( $self->no_server_updates ) {
         $self->logger->warnf( '[%s] Attempted to delete note when "no_server_updates" is set', $note->key );
