@@ -71,6 +71,7 @@ has _ua => (
         return LWP::UserAgent->new(
             agent           => "WebService::Simplenote/$VERSION",
             default_headers => $headers,
+            env_proxy       => 1,
         );
     },
 );
