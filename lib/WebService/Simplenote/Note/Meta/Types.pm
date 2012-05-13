@@ -1,6 +1,6 @@
-package WebService::Simplenote::Types;
+package WebService::Simplenote::Note::Meta::Types;
 
-# ABSTRACT Custom type library
+# ABSTRACT Custom type library for Notes
 
 use Moose::Util::TypeConstraints;
 

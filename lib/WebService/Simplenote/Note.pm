@@ -6,14 +6,27 @@ package WebService::Simplenote::Note;
 
 use v5.10;
 use Moose;
+use Method::Signatures;
 use MooseX::Types::DateTime qw/DateTime/;
-use WebService::Simplenote::Types;
+use WebService::Simplenote::Note::Meta::Types;
+use WebService::Simplenote::Note::Meta::Attribute::Trait::NotSerialised;
 use DateTime;
-use MooseX::Storage;
+use JSON qw//;
 use Log::Any qw//;
 use namespace::autoclean;
 
-with Storage( 'format' => 'JSON', traits => [qw|OnlyWhenBuilt|] );
+around BUILDARGS => sub {
+    my $orig  = shift;
+    my $class = shift;
+    
+    if ( @_ == 1 && !ref $_[0] ) {
+        my $note = JSON->new->utf8->decode($_[0]);
+        return $class->$orig( $note );
+    }
+    else {
+        return $class->$orig(@_);
+    }
+};
 
 has logger => (
     is       => 'ro',
@@ -21,7 +34,7 @@ has logger => (
     lazy     => 1,
     required => 1,
     default  => sub { return Log::Any->get_logger },
-    traits   => ['DoNotSerialize'],
+    traits   => [qw/NotSerialised/],
 );
 
 # set by server
@@ -48,6 +61,7 @@ has deleted => (
     default => 0,
 );
 
+# XXX should default to DateTime->now?
 has [ 'createdate', 'modifydate' ] => (
     is     => 'rw',
     isa    => DateTime,
@@ -95,12 +109,37 @@ has content => (
     trigger => \&_get_title_from_content,
 );
 
-MooseX::Storage::Engine->add_custom_type_handler(
-    'DateTime' => (
-        expand   => sub { $_[0] },
-        collapse => sub { $_[0]->epoch }
-    )
-);
+method serialise {
+    $self->logger->debug('Serialising note using: ', JSON->backend);
+    my $json = JSON->new;
+    $json->allow_blessed;
+    $json->convert_blessed;
+    my $serialised_note = $json->utf8->encode($self);
+
+    return $serialised_note;
+}
+
+method TO_JSON {
+    my %hash;
+    for my $attr ( $self->meta->get_all_attributes ) {
+        next if $attr->does('NotSerialised');
+        my $reader = $attr->get_read_method;
+        if (defined $self->$reader) {
+            $hash{$attr->name} = $self->$reader;
+        }
+    }
+
+    # convert dates, if present
+    if (exists $hash{createdate}) {
+        $hash{createdate} = $self->createdate->epoch;
+    }
+    
+    if (exists $hash{modifydate}) {
+        $hash{modifydate} = $self->modifydate->epoch;
+    }
+    
+    return \%hash;
+}
 
 sub _get_title_from_content {
     my $self = shift;

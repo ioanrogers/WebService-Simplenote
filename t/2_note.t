@@ -23,7 +23,8 @@ ok( $note->isa( 'WebService::Simplenote::Note' ), '... the correct class' );
 
 cmp_ok( $note->title, 'eq', 'Some Content', 'Title is correct' );
 
-ok( my $json_str       = $note->freeze,                                   'Serialise note to JSON' );
-ok( my $note_from_json = decode_json $json_str,                           '...JSON is valid' );
-ok( my $note_thawed    = WebService::Simplenote::Note->thaw( $json_str ), '...can deserialise' );
+ok( my $json_str       = $note->serialise,                               'Serialise note to JSON' );
+ok( my $note_from_json = decode_json $json_str,                          '...JSON is valid' );
+ok( my $note_thawed    = WebService::Simplenote::Note->new( $json_str ), '...can deserialise' );
+
 

@@ -169,7 +169,7 @@ sub put_note {
     $req_uri .= sprintf '?auth=%s&email=%s', $self->token, $self->email;
     $self->logger->debug( "Network: POST to [$req_uri]" );
 
-    my $content = $note->freeze;
+    my $content = $note->serialise;
 
     my $response = $self->_ua->post( $req_uri, Content => $content );
 
@@ -178,7 +178,7 @@ sub put_note {
         return;
     }
 
-    my $note_tmp = WebService::Simplenote::Note->thaw( $response->content );
+    my $note_tmp = WebService::Simplenote::Note->new( $response->content );
 
     # a brand new note will have a key generated remotely
     if ( !defined $note->key ) {
@@ -204,7 +204,7 @@ sub get_note {
         return;
     }
 
-    my $note = WebService::Simplenote::Note->thaw( $response->content );
+    my $note = WebService::Simplenote::Note->new( $response->content );
 
     return $note;
 }
