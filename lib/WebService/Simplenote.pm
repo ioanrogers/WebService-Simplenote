@@ -4,7 +4,7 @@ package WebService::Simplenote;
 
 # TODO: Net::HTTP::Spore?
 
-our $VERSION = '0.1.2';
+our $VERSION = '0.2.0';
 
 use v5.10;
 use open qw(:std :utf8);
