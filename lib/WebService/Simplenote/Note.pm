@@ -18,12 +18,11 @@ use namespace::autoclean;
 around BUILDARGS => sub {
     my $orig  = shift;
     my $class = shift;
-    
-    if ( @_ == 1 && !ref $_[0] ) {
+
+    if (@_ == 1 && !ref $_[0]) {
         my $note = JSON->new->utf8->decode($_[0]);
-        return $class->$orig( $note );
-    }
-    else {
+        return $class->$orig($note);
+    } else {
         return $class->$orig(@_);
     }
 };
@@ -44,7 +43,7 @@ has key => (
 );
 
 # set by server
-has [ 'sharekey', 'publishkey' ] => (
+has ['sharekey', 'publishkey'] => (
     is  => 'ro',
     isa => 'Str',
 );
@@ -62,14 +61,14 @@ has deleted => (
 );
 
 # XXX should default to DateTime->now?
-has [ 'createdate', 'modifydate' ] => (
+has ['createdate', 'modifydate'] => (
     is     => 'rw',
     isa    => DateTime,
     coerce => 1,
 );
 
 # set by server
-has [ 'syncnum', 'version', 'minversion' ] => (
+has ['syncnum', 'version', 'minversion'] => (
     is  => 'rw',
     isa => 'Int',
 );
@@ -93,9 +92,9 @@ has systemtags => (
     isa     => 'ArrayRef[SystemTags]',
     default => sub { [] },
     handles => {
-        set_markdown => [ push  => 'markdown' ],
-        is_markdown  => [ first => sub { /^markdown/ } ],
-        set_pinned   => [ push  => 'pinned' ],
+        set_markdown => [push  => 'markdown'],
+        is_markdown  => [first => sub {/^markdown/}],
+        set_pinned   => [push  => 'pinned'],
         join_systags   => 'join',
         has_systags    => 'count',
         has_no_systags => 'is_empty',
@@ -121,7 +120,7 @@ method serialise {
 
 method TO_JSON {
     my %hash;
-    for my $attr ( $self->meta->get_all_attributes ) {
+    for my $attr ($self->meta->get_all_attributes) {
         next if $attr->does('NotSerialised');
         my $reader = $attr->get_read_method;
         if (defined $self->$reader) {
@@ -133,11 +132,11 @@ method TO_JSON {
     if (exists $hash{createdate}) {
         $hash{createdate} = $self->createdate->epoch;
     }
-    
+
     if (exists $hash{modifydate}) {
         $hash{modifydate} = $self->modifydate->epoch;
     }
-    
+
     return \%hash;
 }
 
@@ -161,7 +160,7 @@ sub _get_title_from_content {
     $title =~ s/^\s+//;
     $title =~ s/\s+$//;
 
-    $self->title( $title );
+    $self->title($title);
 
     return 1;
 }
