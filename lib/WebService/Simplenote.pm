@@ -6,71 +6,40 @@ package WebService::Simplenote;
 
 our $VERSION = '0.2.1';
 
-use v5.10;
+use v5.10.1;
 use open qw(:std :utf8);
-use Moose;
-use MooseX::Types::Path::Class;
+use Moo;
+use MooX::Types::MooseLike::Base qw/:all/;
 use JSON;
 use LWP::UserAgent;
 use HTTP::Cookies;
 use Log::Any qw//;
-use DateTime;
 use MIME::Base64 qw//;
-use Try::Tiny;
 use WebService::Simplenote::Note;
 use Method::Signatures;
-use namespace::autoclean;
 
-has ['email', 'password'] => (
-    is       => 'ro',
-    isa      => 'Str',
-    required => 1,
-);
+with qw/WebService::Simplenote::Role::Logger/;
 
-has _token => (
-    is        => 'rw',
-    isa       => 'Str',
-    predicate => 'has_logged_in',
-);
+# TODO email type using email::valid?
+has email    => ( is => 'ro', isa => Str, required => 1);
+has password => ( is => 'ro', isa => Str, required => 1);
 
-has no_server_updates => (
-    is       => 'ro',
-    isa      => 'Bool',
-    required => 1,
-    default  => 0,
-);
+has _token => ( is => 'rw', isa => Str, predicate => 'has_logged_in');
 
-has page_size => (
-    is       => 'ro',
-    isa      => 'Int',
-    required => 1,
-    default  => 20,
-);
+has no_server_updates => ( is => 'ro', isa => Bool, default  => sub { 0 }, );
+has page_size => (is => 'ro', isa => Int, default => sub {20});
 
 has logger => (
-    is       => 'ro',
-    isa      => 'Object',
-    lazy     => 1,
-    required => 1,
-    default  => sub { return Log::Any->get_logger },
+    is      => 'ro',
+    lazy    => 1,
+    isa     => Object,
+    default => sub { return Log::Any->get_logger },
 );
 
-has _uri => (
-    is       => 'ro',
-    isa      => 'Str',
-    default  => 'https://simple-note.appspot.com/api2',
-    required => 1,
-);
-
-has _ua => (
-    is         => 'ro',
-    isa        => 'LWP::UserAgent',
-    required   => 1,
-    lazy_build => 1,
-);
+has _url => ( is => 'ro', isa => Str, default => sub {'https://simple-note.appspot.com/api2'});
+has _ua => ( is => 'lazy', isa => Object);
 
 method _build__ua {
-
     my $headers = HTTP::Headers->new(Content_Type => 'application/json',);
 
     # XXX is it worth saving cookie?? How is password more valuable than auth token?
@@ -92,7 +61,7 @@ method _login {
 
     $self->logger->debug('Network: getting auth token');
 
-    # the login uri uses api instead of api2 and must always be https
+    # the login url uses api instead of api2 and must always be https
     my $response =
       $self->_ua->post('https://simple-note.appspot.com/api/login',
         Content => $content);
@@ -106,36 +75,38 @@ method _login {
     return 1;
 }
 
-method _build_req_uri(Str $path, HashRef $options?) {
-    my $req_uri = sprintf '%s/%s', $self->_uri, $path;
+sub _build_req_url {
+    my ($self, $path, $options) = @_;
+
+    my $req_url = sprintf '%s/%s', $self->_url, $path;
 
     if (!$self->has_logged_in) {
         $self->_login;
     }
 
-    return $req_uri if !defined $options;
+    return $req_url if !defined $options;
 
-    $req_uri .= '?';
+    $req_url .= '?';
     while (my ($option, $value) = each %$options) {
-        $req_uri .= "&$option=$value";
+        $req_url .= "&$option=$value";
     }
 
-    return $req_uri;
+    return $req_url;
 }
 
-method _get_remote_index_page(Str $mark?) {
+method _get_remote_index_page($mark?) {
     my $notes;
 
-    my $req_uri = $self->_build_req_uri('index', {length => $self->page_size});
+    my $req_url = $self->_build_req_url('index', {length => $self->page_size});
 
     if (defined $mark) {
         $self->logger->debug('Network: retrieving next page');
-        $req_uri .= '&mark=' . $mark;
+        $req_url .= '&mark=' . $mark;
     }
 
-    $self->logger->debug('Network: retrieving ' . $req_uri);
+    $self->logger->debug('Network: retrieving ' . $req_url);
 
-    my $response = $self->_ua->get($req_uri);
+    my $response = $self->_ua->get($req_url);
     if (!$response->is_success) {
         $self->logger->error('Network: ' . $response->status_line);
         return;
@@ -184,27 +155,27 @@ method get_remote_index {
 }
 
 # Given a local file, upload it as a note at simplenote web server
-method put_note(WebService::Simplenote::Note $note) {
+method put_note($note) {
 
     if ($self->no_server_updates) {
         $self->logger->warn('Sending notes to the server is disabled');
         return;
     }
 
-    my $req_uri = $self->_build_req_uri('data');
+    my $req_url = $self->_build_req_url('data');
 
     if (defined $note->key) {
         $self->logger->infof('[%s] Updating existing note', $note->key);
-        $req_uri .= '/' . $note->key,;
+        $req_url .= '/' . $note->key,;
     } else {
         $self->logger->debug('Uploading new note');
     }
 
-    $self->logger->debug("Network: POST to [$req_uri]");
+    $self->logger->debug("Network: POST to [$req_url]");
 
     my $content = $note->serialise;
 
-    my $response = $self->_ua->post($req_uri, Content => $content);
+    my $response = $self->_ua->post($req_url, Content => $content);
 
     if (!$response->is_success) {
         $self->logger->errorf('Failed uploading note: %s',
@@ -224,13 +195,14 @@ method put_note(WebService::Simplenote::Note $note) {
 }
 
 # Save local copy of note from Simplenote server
-method get_note(Str $key) {
+method get_note($key) {
+    
     $self->logger->infof('Retrieving note [%s]', $key);
 
     # TODO are there any other encoding options?
-    my $req_uri = $self->_build_req_uri("data/$key");
-    $self->logger->debug("Network: GETting [$req_uri]");
-    my $response = $self->_ua->get($req_uri);
+    my $req_url = $self->_build_req_url("data/$key");
+    $self->logger->debug("Network: GETting [$req_url]");
+    my $response = $self->_ua->get($req_url);
 
     if (!$response->is_success) {
         $self->logger->errorf('[%s] could not be retrieved: %s',
@@ -244,7 +216,7 @@ method get_note(Str $key) {
 }
 
 # Delete specified note from Simplenote server
-method delete_note(WebService::Simplenote::Note $note) {
+method delete_note($note) {
 
     if ($self->no_server_updates) {
         $self->logger->warnf(
@@ -261,21 +233,19 @@ method delete_note(WebService::Simplenote::Note $note) {
     }
 
     $self->logger->infof('[%s] Deleting from trash', $note->key);
-    my $req_uri = $self->_build_req_uri('data/' . $note->key);
-    $self->logger->debug("Network: DELETE on [$req_uri]");
-    my $response = $self->_ua->delete($req_uri);
+    my $req_url = $self->_build_req_url('data/' . $note->key);
+    $self->logger->debug("Network: DELETE on [$req_url]");
+    my $response = $self->_ua->delete($req_url);
 
     if (!$response->is_success) {
         $self->logger->errorf('[%s] Failed to delete note from trash: %s',
             $note->key, $response->status_line);
-        $self->logger->debug("Uri: [$req_uri]");
+        $self->logger->debug("url: [$req_url]");
         return;
     }
 
     return 1;
 }
-
-__PACKAGE__->meta->make_immutable;
 
 1;
 
@@ -358,3 +328,4 @@ Designed for use with Simplenote:
 Based on SimplenoteSync:
 
 <http://fletcherpenney.net/other_projects/simplenotesync/>
+

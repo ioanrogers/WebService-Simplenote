@@ -13,8 +13,8 @@ my $date = DateTime->new(
 );
 
 my $note = WebService::Simplenote::Note->new(
-    createdate => $date->epoch,
-    modifydate => $date->epoch,
+    createdate => $date,
+    modifydate => $date,
     content    => "# Some Content #\n This is a test",
 );
 
@@ -26,5 +26,3 @@ cmp_ok( $note->title, 'eq', 'Some Content', 'Title is correct' );
 ok( my $json_str       = $note->serialise,                               'Serialise note to JSON' );
 ok( my $note_from_json = decode_json $json_str,                          '...JSON is valid' );
 ok( my $note_thawed    = WebService::Simplenote::Note->new( $json_str ), '...can deserialise' );
-
-

@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 
-use v5.10;
+use v5.10.1;
 use strict;
 use warnings;
 
@@ -8,9 +8,10 @@ use WebService::Simplenote;
 use WebService::Simplenote::Note;
 use Log::Dispatch;
 use Log::Any::Adapter;
+use Data::Printer;
 
-my $email    = shift;
-my $password = shift;
+my $email    = shift || die "EMAIL!";
+my $password = shift || die "PASSWORD!";
 
 my $logger = Log::Dispatch->new( outputs => [ [ 'Screen', min_level => 'debug', newline => 1 ], ], );
 Log::Any::Adapter->set( 'Dispatch', dispatcher => $logger );
@@ -25,11 +26,11 @@ my $notes = $sn->get_remote_index;
 foreach my $note_id ( keys %$notes ) {
     my $note = $sn->get_note( $note_id );
     printf "[%s] %s\n\n", $note->modifydate->iso8601, $note->title;
-
+    p $note;
     #$note->deleted(1);
     #$sn->delete_note($note);
 }
 
-my $new_note = WebService::Simplenote::Note->new( content => "Some stuff", );
+#my $new_note = WebService::Simplenote::Note->new( content => "Some stuff", );
 
 #$sn->put_note( $new_note );

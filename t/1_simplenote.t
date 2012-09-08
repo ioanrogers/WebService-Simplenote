@@ -20,4 +20,3 @@ ok( $sn->isa( 'WebService::Simplenote' ), '... the correct class' );
 ok( $sn->_login, 'log in and get auth token' );
 
 ok( my $remote_index = $sn->get_remote_index, 'list remote notes' );
-

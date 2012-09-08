@@ -2,110 +2,87 @@ package WebService::Simplenote::Note;
 
 # ABSTRACT: represents an individual note
 
-# TODO: API support for tags
-
-use v5.10;
-use Moose;
-use MooseX::Types::DateTime qw/DateTime/;
-use WebService::Simplenote::Note::Meta::Types;
-use WebService::Simplenote::Note::Meta::Attribute::Trait::NotSerialised;
-use Method::Signatures;
+use v5.10.1;
+use Moo;
+use MooX::Types::MooseLike::Base qw/:all/;
+use WebService::Simplenote::Types qw/:all/;
+use WebService::Simplenote::Note::SystemTags;
 use DateTime;
 use JSON qw//;
 use Log::Any qw//;
-use namespace::autoclean;
+use List::Util qw/first/;
+use Method::Signatures;
+use Data::Printer;
 
-around BUILDARGS => sub {
-    my $orig  = shift;
-    my $class = shift;
+with qw/WebService::Simplenote::Role::Logger/;
 
-    if (@_ == 1 && !ref $_[0]) {
-        my $note = JSON->new->utf8->decode($_[0]);
-        return $class->$orig($note);
+sub BUILDARGS {
+    my ($class, @args) = @_;
+    
+    # new can be called with a scalar containing JSON string, a hash or a hashref
+    if (@args == 1 && !ref $args[0] ) {
+        say $args[0];
+        my $note = JSON->new->utf8->decode($args[0]);
+        return $note;
+    } elsif (@args == 1 && ref $args[0] eq 'HASH') {
+        return $args[0];
     } else {
-        return $class->$orig(@_);
+        return { @args };
     }
 };
 
-has logger => (
-    is       => 'ro',
-    isa      => 'Object',
-    lazy     => 1,
-    required => 1,
-    default  => sub { return Log::Any->get_logger },
-    traits   => [qw/NotSerialised/],
-);
-
 # set by server
-has key => (
-    is  => 'rw',
-    isa => 'Str',
-);
+has key        => ( is => 'rw', isa => Str ) ;
+has publishkey => ( is => 'ro', isa => Str );
+has sharekey   => ( is => 'ro', isa => Str );
+has syncnum    => ( is => 'ro', isa => Int );
+has version    => ( is => 'ro', isa => Int );
+has minversion => ( is => 'ro', isa => Int );
 
-# set by server
-has ['sharekey', 'publishkey'] => (
-    is  => 'ro',
-    isa => 'Str',
-);
-
-has title => (
-    is  => 'rw',
-    isa => 'Str',
-);
-
-has deleted => (
-    is      => 'rw',
-    isa     => 'Bool',
-    lazy    => 1,
-    default => 0,
-);
+has title   => ( is => 'rw', isa => Str );
+has deleted => ( is => 'rw', isa => Bool, default => sub { 0 } );
+# XXX: always coerce to utf-8?
+has content => ( is => 'rw', isa => Str, trigger => 1 );
 
 # XXX should default to DateTime->now?
-has ['createdate', 'modifydate'] => (
+# TODO DateTime type
+has createdate => (
     is     => 'rw',
-    isa    => DateTime,
-    coerce => 1,
+    isa    => WSSnDateTime,
+    coerce => sub { WebService::Simplenote::Types::to_DateTime(shift) },
 );
 
-# set by server
-has ['syncnum', 'version', 'minversion'] => (
-    is  => 'rw',
-    isa => 'Int',
+has modifydate => (
+    is     => 'rw',
+    isa    => WSSnDateTime,
+    coerce => sub { WebService::Simplenote::Types::to_DateTime(shift) },
 );
 
 has tags => (
     is      => 'rw',
-    traits  => ['Array'],
-    isa     => 'ArrayRef[Str]',
+    isa     => ArrayRef[Str],
     default => sub { [] },
-    handles => {
-        add_tag     => 'push',
-        join_tags   => 'join',
-        has_tags    => 'count',
-        has_no_tags => 'is_empty',
-    },
+    # #handles => {
+        # #add_tag     => 'push',
+        # #join_tags   => 'join',
+        # #has_tags    => 'count',
+        # #has_no_tags => 'is_empty',
+    # #},
 );
 
 has systemtags => (
     is      => 'rw',
-    traits  => ['Array'],
-    isa     => 'ArrayRef[SystemTags]',
-    default => sub { [] },
-    handles => {
-        set_markdown => [push  => 'markdown'],
-        is_markdown  => [first => sub {/^markdown/}],
-        set_pinned   => [push  => 'pinned'],
-        join_systags   => 'join',
-        has_systags    => 'count',
-        has_no_systags => 'is_empty',
+    #isa     => ArrayRef[WSSnSystemTag],
+    isa     => Object,
+    default => sub {WebService::Simplenote::Note::SystemTags->new },
+    handles => 'WebService::Simplenote::Role::Note::SystemTags',
+    coerce =>  sub {
+        if (ref $_[0] ne 'ARRAY') {
+            return $_[0];
+        }
+        my %tags = map { $_ => 1 } @{$_[0]};
+        return WebService::Simplenote::Note::SystemTags->new(%tags);
     },
-);
-
-# XXX: always coerce to utf-8?
-has content => (
-    is      => 'rw',
-    isa     => 'Str',
-    trigger => \&_get_title_from_content,
 );
 
 method serialise {
@@ -119,15 +96,8 @@ method serialise {
 }
 
 method TO_JSON {
-    my %hash;
-    for my $attr ($self->meta->get_all_attributes) {
-        next if $attr->does('NotSerialised');
-        my $reader = $attr->get_read_method;
-        if (defined $self->$reader) {
-            $hash{$attr->name} = $self->$reader;
-        }
-    }
-
+    my %hash = %{$self};
+    
     # convert dates, if present
     if (exists $hash{createdate}) {
         $hash{createdate} = $self->createdate->epoch;
@@ -137,10 +107,14 @@ method TO_JSON {
         $hash{modifydate} = $self->modifydate->epoch;
     }
 
+    delete $hash{logger}; # don't serialise the logger
+    
+    $hash{systemtags} = $self->systemtags->to_array;
+    
     return \%hash;
 }
 
-sub _get_title_from_content {
+sub _trigger_content {
     my $self = shift;
 
     my $content = $self->content;
@@ -164,8 +138,6 @@ sub _get_title_from_content {
 
     return 1;
 }
-
-__PACKAGE__->meta->make_immutable;
 
 1;
 
@@ -224,7 +196,7 @@ Server-set unique id for the note.
 
 =item title
 
-Simplenote doens't use titles, so we autogenerate one from the first line of content.
+Simplenote doesn't use titles, so we autogenerate one from the first line of content.
 
 =item deleted
 
