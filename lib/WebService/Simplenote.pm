@@ -2,9 +2,7 @@ package WebService::Simplenote;
 
 # ABSTRACT: Note-taking through simplenoteapp.com
 
-# TODO: Net::HTTP::Spore?
-
-our $VERSION = '0.2.1';
+our $VERSION = '0.3.0';
 
 use v5.10.1;
 use open qw(:std :utf8);
@@ -20,7 +18,6 @@ use Method::Signatures;
 
 with qw/WebService::Simplenote::Role::Logger/;
 
-# TODO email type using email::valid?
 has email    => ( is => 'ro', isa => Str, required => 1);
 has password => ( is => 'ro', isa => Str, required => 1);
 
@@ -209,7 +206,7 @@ method get_note($key) {
             $key, $response->status_line);
         return;
     }
-
+say "MAKING NEW NOTE";
     my $note = WebService::Simplenote::Note->new($response->content);
 
     return $note;

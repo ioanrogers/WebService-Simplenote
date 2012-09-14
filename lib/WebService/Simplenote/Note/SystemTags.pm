@@ -5,60 +5,61 @@ package WebService::Simplenote::Note::SystemTags;
 use v5.10.1;
 use Moo;
 use MooX::Types::MooseLike::Base qw/:all/;
+use Method::Signatures;
 with 'WebService::Simplenote::Role::Note::SystemTags';
 
 has markdown => ( is => 'rw', isa => Bool, default => sub {0} );
 has pinned   => ( is => 'rw', isa => Bool, default => sub {0} );
-has unread   => ( is => 'rw', isa => Bool, default => sub {1} );
+has unread   => ( is => 'rw', isa => Bool, default => sub {0} );
 has list     => ( is => 'rw', isa => Bool, default => sub {0} );
 
-sub is_markdown {
-    return shift->markdown;
+method is_markdown {
+    return $self->markdown;
 }
 
-sub set_markdown {
-    my ($self, $arg) = @_;
-    $arg //= 1; # no args always turns it on
+method set_markdown($arg = 1) {
     $self->markdown($arg);
     return 1;
 }
 
-sub is_pinned {
-    return shift->pinned;
+method is_pinned {
+    return $self->pinned;
 }
 
-sub set_pinned {
-    my ($self, $arg) = @_;
-    $arg //= 1; # no args always turns it on
+method set_pinned($arg = 1) {
     $self->pinned($arg);
     return 1;
 }
 
-sub is_unread {
-    return shift->unread;
+method is_unread {
+    return $self->unread;
 }
 
-sub set_unread {
-    my ($self, $arg) = @_;
-    $arg //= 1; # no args always turns it on
+method set_unread($arg = 1) {
     $self->unread($arg);
     return 1;
 }
 
-sub is_list {
-    return shift->list;
+method is_list {
+    return $self->list;
 }
 
-sub set_list {
-    my ($self, $arg) = @_;
-    $arg //= 1; # no args always turns it on
+method set_list($arg = 1) {
     $self->list($arg);
     return 1;
 }
 
-sub to_array {
-    my $self = shift;
-    
+method has_systemtags {
+    foreach my $systemtag (qw/markdown pinned unread list/) {
+        my $method = "is_$systemtag";
+        if ($self->$method) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+method to_array {
     my @systemtags;
     foreach my $systemtag (qw/markdown pinned unread list/) {
         my $method = "is_$systemtag";
@@ -66,8 +67,11 @@ sub to_array {
             push @systemtags, $systemtag;
         }
     }
-    
-    return \@systemtags;
+    return wantarray ? @systemtags : \@systemtags;
+}
+
+method to_string {
+    return join ',', $self->to_array;
 }
 
 1;

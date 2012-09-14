@@ -1,10 +1,9 @@
 #!/usr/bin/env perl -w
 
-use Test::More; #tests => 6;
+use Test::More tests => 24;
 
 use WebService::Simplenote::Note;
 use DateTime;
-use Data::Printer;
 
 my $date = DateTime->now;
 
@@ -17,6 +16,7 @@ my $note = WebService::Simplenote::Note->new(
 ok(!$note->is_markdown, 'NOT flagged markdown');
 ok($note->set_markdown, 'Setting markdown');
 ok($note->is_markdown, 'IS flagged markdown');
+is($note->systemtags->to_string, 'markdown', 'Stringified systemtags');
 ok($note->set_markdown(0), 'UNsetting markdown');
 ok(!$note->is_markdown, 'NOT flagged markdown again');
 
@@ -32,10 +32,17 @@ ok($note->is_list, 'IS list');
 ok($note->set_list(0), 'UNsetting list');
 ok(!$note->is_list, 'NOT list again');
 
-ok($note->is_unread, 'IS unread');
-ok($note->set_unread(0), 'UNsetting unread');
 ok(!$note->is_unread, 'NOT unread');
 ok($note->set_unread, 'Setting unread');
-ok($note->is_unread, 'IS unread again');
-p $note;
-done_testing;
+ok($note->is_unread, 'IS unread');
+ok($note->has_systemtags, 'Has systemtags');
+
+$note->set_markdown;
+is($note->systemtags->to_string, 'markdown,unread', 'Stringified systemtags');
+$note->set_markdown(0);
+
+ok($note->set_unread(0), 'UNsetting unread');
+ok(!$note->has_systemtags, 'Has NO systemtags');
+ok(!$note->is_unread, 'NOT unread again');
+
+

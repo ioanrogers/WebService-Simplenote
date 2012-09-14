@@ -8,6 +8,7 @@ use Moo::Role;
 requires qw/
     is_markdown set_markdown is_pinned set_pinned
     is_unread   set_unread   is_list   set_list
+    has_systemtags
 /;
 
 1;

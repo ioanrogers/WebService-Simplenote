@@ -7,6 +7,7 @@ use Moo;
 use MooX::Types::MooseLike::Base qw/:all/;
 use WebService::Simplenote::Types qw/:all/;
 use WebService::Simplenote::Note::SystemTags;
+use WebService::Simplenote::Note::Tags;
 use DateTime;
 use JSON qw//;
 use Log::Any qw//;
@@ -21,7 +22,6 @@ sub BUILDARGS {
     
     # new can be called with a scalar containing JSON string, a hash or a hashref
     if (@args == 1 && !ref $args[0] ) {
-        say $args[0];
         my $note = JSON->new->utf8->decode($args[0]);
         return $note;
     } elsif (@args == 1 && ref $args[0] eq 'HASH') {
@@ -39,7 +39,7 @@ has syncnum    => ( is => 'ro', isa => Int );
 has version    => ( is => 'ro', isa => Int );
 has minversion => ( is => 'ro', isa => Int );
 
-has title   => ( is => 'rw', isa => Str );
+has title   => ( is => 'rw', isa => Str, lazy => 1 );
 has deleted => ( is => 'rw', isa => Bool, default => sub { 0 } );
 # XXX: always coerce to utf-8?
 has content => ( is => 'rw', isa => Str, trigger => 1 );
@@ -60,20 +60,25 @@ has modifydate => (
 
 has tags => (
     is      => 'rw',
-    isa     => ArrayRef[Str],
-    default => sub { [] },
-    # #handles => {
-        # #add_tag     => 'push',
-        # #join_tags   => 'join',
-        # #has_tags    => 'count',
-        # #has_no_tags => 'is_empty',
-    # #},
+    isa     => InstanceOf['WebService::Simplenote::Note::Tags'],
+    default => sub {WebService::Simplenote::Note::Tags->new },
+    handles => 'WebService::Simplenote::Role::Note::Tags',
+    coerce =>  sub {
+        # XXX What about non-arrays!?
+        if (ref $_[0] ne 'ARRAY') {
+            #warn ref $_[0];
+            return $_[0];
+        }
+        #say "Args is an ARRAY";
+        #p @_;
+        #my %tags = map { $_ => 1 } @{$_[0]};
+        return WebService::Simplenote::Note::Tags->new(@_);
+    },
 );
 
 has systemtags => (
     is      => 'rw',
-    #isa     => ArrayRef[WSSnSystemTag],
-    isa     => Object,
+    isa     => InstanceOf['WebService::Simplenote::Note::SystemTags'],
     default => sub {WebService::Simplenote::Note::SystemTags->new },
     handles => 'WebService::Simplenote::Role::Note::SystemTags',
     coerce =>  sub {
@@ -97,7 +102,6 @@ method serialise {
 
 method TO_JSON {
     my %hash = %{$self};
-    
     # convert dates, if present
     if (exists $hash{createdate}) {
         $hash{createdate} = $self->createdate->epoch;
@@ -110,6 +114,7 @@ method TO_JSON {
     delete $hash{logger}; # don't serialise the logger
     
     $hash{systemtags} = $self->systemtags->to_array;
+    $hash{tags}       = $self->tags->to_array;
     
     return \%hash;
 }
